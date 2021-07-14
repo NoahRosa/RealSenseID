@@ -31,7 +31,7 @@ make -j
 ```
 ## Usage
 
-To use this sample, first you need to enroll the admin user running either ```build/bin/enroll-cpp-sample``` or ```build/bin/rsid-cli```
+To use this sample, first you need to enroll the admin user running either ```build/bin/enroll-cpp-sample``` or ```build/bin/rsid-cli```.
 
 To run the example run
 ```bash
