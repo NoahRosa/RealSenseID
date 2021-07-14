@@ -7,13 +7,18 @@ Copyright(c) 2011-2020 Intel Corporation. All Rights Reserved.
 *******************************************************************************/
 #pragma once
 
-#include "Faceprints.h"
-#include <string>
+#include "RealSenseID/Faceprints.h"
+
 namespace RealSenseID
 {
-    struct UserFaceprints
-    {
-        std::string user_id;
-        Faceprints faceprints;
-    };
-}
+/**
+ * Face biometrics interface.
+ * Will be used to provide extracted face faceprints from FaceBiometrics operations.
+ */
+class ExtendedFaceprints
+{
+public:
+	char user_id[16]; // user id with null char
+	Faceprints faceprints;    
+};
+} // namespace RealSenseID

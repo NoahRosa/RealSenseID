@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <string>
 #include <cassert>
+#include <map>
+
 #include "MetadataDefines.h"
 
 namespace RealSenseID
@@ -14,8 +16,6 @@ namespace Capture
 static const StreamAttributes RAW10_1080P_ATTR {1920, 1080, RAW};
 static const StreamAttributes MJPEG_1080P_ATTR {1056, 1920, MJPEG};
 static const StreamAttributes MJPEG_720P_ATTR {704, 1280, MJPEG};
-static const StreamAttributes MJPEG_1080P_HORIZON_ATTR {1920, 1056, MJPEG};
-static const StreamAttributes MJPEG_720P_HORIZON_ATTR {1280, 704, MJPEG};
 #ifdef ANDROID
 static constexpr int RGB_PIXEL_SIZE = 4;
 #else
@@ -23,44 +23,65 @@ static constexpr int RGB_PIXEL_SIZE = 3;
 #endif
 static const char* LOG_TAG = "StreamConverter";
 
-static const StreamAttributes GetStreamAttributesByMode(PreviewConfig config)
+static const StreamAttributes GetStreamAttributesByMode(PreviewMode mode)
 {
-    switch (config.previewMode)
+    static std::map<PreviewMode, StreamAttributes> preview_map = {
+        {PreviewMode::MJPEG_1080P, MJPEG_1080P_ATTR},
+        {PreviewMode::MJPEG_720P, MJPEG_720P_ATTR},
+        {PreviewMode::RAW10_1080P, RAW10_1080P_ATTR},
+    };
+
+    if (preview_map.find(mode) == preview_map.end())
     {
-        case PreviewMode::MJPEG_1080P:
-            return config.portraitMode ? MJPEG_1080P_ATTR : MJPEG_1080P_HORIZON_ATTR;
-        case PreviewMode::MJPEG_720P:
-            return config.portraitMode ? MJPEG_720P_ATTR : MJPEG_720P_HORIZON_ATTR;
-        case PreviewMode::RAW10_1080P:
-            return RAW10_1080P_ATTR;
-        default:
-            LOG_ERROR(LOG_TAG, "Got non-legal PreviewMode. using Defualt");
-            return MJPEG_1080P_ATTR; 
+        LOG_ERROR(LOG_TAG, "Got non-legal PreviewMode. using Defualt");
+        return MJPEG_1080P_ATTR;
     }
+    return preview_map.at(mode);
 }
 
-ImageMetadata ExtractMetadataFromMDBuffer(const buffer& buffer, bool to_mili = false)
+// Extracts metadata from buffers
+ImageMetadata ExtractMetadataFromImage(buffer buffer)
 {
     ImageMetadata md;
-    
+    if (buffer.size < 6 || buffer.data == nullptr)
+        return md;
+
+    md.timestamp = *(reinterpret_cast<const int32_t*>(buffer.data));
+
+    if (md.timestamp == 0) // not valid image
+        return md;
+
+    md.status = *(buffer.data + 4);
+
+    unsigned char boolean_data = *(buffer.data + 5);
+    md.sensor_id = (boolean_data)&1;
+    md.led = (boolean_data) & (1 << 1);
+    md.projector = (boolean_data) & (1 << 2);
+
+    return md;
+}
+
+ImageMetadata ExtractMetadataFromMDBuffer(buffer buffer, bool to_mili = false)
+{
+    ImageMetadata md;
+    md_middle_level* tmp_md;
     int divide_ts = to_mili ? 1000 : 1; // from micro to mili
 
     if (buffer.size < md_middle_level_size || buffer.data == nullptr)
         return md;
-  
-    auto tmp_md = reinterpret_cast<md_middle_level*>(buffer.data + buffer.offset);
 
-    if (tmp_md->exposure == 0 && tmp_md->gain == 0) // not valid image
+    tmp_md = reinterpret_cast<md_middle_level*>(buffer.data);
+
+    if (tmp_md->exposure_time == 0 && tmp_md->gain_value == 0) // not valid image
         return md;
-
-    constexpr unsigned int snapshot_jpeg_attribute = (1u << 7);
 
     md.timestamp = tmp_md->sensor_timestamp / divide_ts;
     md.led = tmp_md->led_status;
-    md.projector = tmp_md->projector_status;
+    md.projector = tmp_md->laser_status;
     md.sensor_id = tmp_md->sensor_id;
     md.status = tmp_md->status;
-    md.is_snapshot = tmp_md->flags & snapshot_jpeg_attribute;
+
+    LOG_TRACE(LOG_TAG, "timestamp:%d,led:%d,projector:%d", md.timestamp, md.led, md.projector);
 
     return md;
 }
@@ -83,9 +104,9 @@ void StreamConverter::InitDecompressor()
 }
 
 // StreamConverter
-StreamConverter::StreamConverter(PreviewConfig config)
+StreamConverter::StreamConverter(PreviewMode mode)
 {
-    _attributes = GetStreamAttributesByMode(config);
+    _attributes = GetStreamAttributesByMode(mode);
     _result_image.width = _attributes.width;
     _result_image.height = _attributes.height;
     _result_image.size = (_attributes.format == MJPEG) ? _result_image.width * _result_image.height * RGB_PIXEL_SIZE
@@ -123,7 +144,7 @@ bool StreamConverter::DecodeJpeg(Image* res, buffer frame_buffer)
     ::jpeg_start_decompress(&_jpeg_dinfo);
     auto width = _jpeg_dinfo.output_width;
     auto height = _jpeg_dinfo.output_height;
-    if (height > _result_image.height || width > _result_image.width)
+    if (height > _result_image.height || width > _result_image.height)
     {        
         LOG_ERROR(LOG_TAG, "jpeg decoded dimensions are bigger than expected");
         return false;
@@ -143,16 +164,10 @@ bool StreamConverter::DecodeJpeg(Image* res, buffer frame_buffer)
         LOG_ERROR(LOG_TAG, "jpeg_finish_decompress failed");
         return false;
     }
-
-    res->height = height;
-    res->width = width;
-    res->stride = row_stride;
-    res->size = res->stride * res->height;
-
     return true;
 }
 
-bool StreamConverter::Buffer2Image(Image* res,const buffer& frame_buffer,const buffer& md_buffer)
+bool StreamConverter::Buffer2Image(Image* res, buffer frame_buffer,buffer md_buffer)
 {
     *res = _result_image;
     switch (_attributes.format) // process image by mode
@@ -161,19 +176,18 @@ bool StreamConverter::Buffer2Image(Image* res,const buffer& frame_buffer,const b
         try
         {
             res->metadata = ExtractMetadataFromMDBuffer(md_buffer,true);
-            bool decode_success = DecodeJpeg(res, frame_buffer);
-            return decode_success;
+            return DecodeJpeg(res, frame_buffer);
         }
         catch (const std::exception& ex)
         {
-            LOG_DEBUG(LOG_TAG, "%s", ex.what());
+            LOG_ERROR(LOG_TAG, "%s", ex.what());
             ::jpeg_destroy_decompress(&_jpeg_dinfo);
             InitDecompressor();
             return false;
         }
         break;
     case RAW:
-        res->metadata = ExtractMetadataFromMDBuffer(md_buffer);
+        res->metadata = md_buffer.size== 0 ? ExtractMetadataFromImage(frame_buffer) : ExtractMetadataFromMDBuffer(md_buffer);
         if (res->metadata.timestamp == 0) // don't return non-dumped images
             return false;
         ::memcpy(res->buffer, frame_buffer.data, frame_buffer.size);
@@ -185,7 +199,7 @@ bool StreamConverter::Buffer2Image(Image* res,const buffer& frame_buffer,const b
     }    
 }
 
-bool StreamConverter::Buffer2Image(Image* res,const buffer& frame_buffer)
+bool StreamConverter::Buffer2Image(Image* res, buffer frame_buffer)
 {
     buffer dummy;
     return Buffer2Image(res, frame_buffer, dummy);

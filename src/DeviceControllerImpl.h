@@ -6,9 +6,7 @@
 #include "RealSenseID/SerialConfig.h"
 #include "RealSenseID/Status.h"
 #include "PacketManager/SerialConnection.h"
-#ifdef ANDROID
-#include "RealSenseID/AndroidSerialConfig.h"
-#endif
+
 #include <memory>
 
 namespace RealSenseID
@@ -24,7 +22,7 @@ public:
 
     Status Connect(const SerialConfig& config);
 #ifdef ANDROID
-    Status Connect(const AndroidSerialConfig& config);
+    Status Connect(int fileDescriptor, int readEndpointAddress, int writeEndpointAddress);
 #endif
     void Disconnect();
 

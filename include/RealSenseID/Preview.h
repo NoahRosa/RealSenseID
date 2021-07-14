@@ -16,7 +16,7 @@ enum class PreviewMode
 {
     MJPEG_1080P = 0, // default
     MJPEG_720P = 1,
-    RAW10_1080P = 2,
+    RAW10_1080P = 2 // dump all frames
 };
 
 /**
@@ -26,7 +26,6 @@ struct RSID_API PreviewConfig
 {
     int cameraNumber = -1; // attempt to auto detect by default
     PreviewMode previewMode = PreviewMode::MJPEG_1080P; // RAW10 requires custom fw support
-    bool portraitMode = true;  // change Preview to get portrait or landscape images. Algo process is defined seperatly in DeviceConfig::CameraRotation
 };
 
 /**
@@ -39,7 +38,6 @@ struct RSID_API ImageMetadata
     unsigned int sensor_id = 0;
     bool led = false;
     bool projector = false;
-    bool is_snapshot = false;
 };
 
 /**
@@ -58,16 +56,13 @@ struct RSID_API Image
 
 /**
  * User defined callback for preview.
- * OnPreviewImageReady Callback will be used to provide preview image.
- * OnSnapshotImageReady Callback will be used to provide snapshot image -a cropped face image for any authentication/enrollment.
- * OnSnapshotImageReady relevant only if DeviceConfig::dump_mode == DumpMode::CroppedFace
+ * Callback will be used to provide preview image.
  */
 class RSID_API PreviewImageReadyCallback
 {
 public:
     virtual ~PreviewImageReadyCallback() = default;
     virtual void OnPreviewImageReady(const Image image) = 0;
-    virtual void OnSnapshotImageReady(const Image image) {}; // Empty implemention for backward compability
 };
 
 /**

@@ -6,7 +6,6 @@
 #include "RealSenseID/DiscoverDevices.h"
 #include "RawToRgb.h"
 #include <chrono>
-#include <stdexcept>
 
 static const char* LOG_TAG = "Preview";
 
@@ -14,22 +13,17 @@ namespace RealSenseID
 {
 PreviewImpl::PreviewImpl(const PreviewConfig& config) : _config(config)
 {
-    if (config.cameraNumber == -1) // auto detection
+    if (config.cameraNumber == -1)
     {
         std::vector<int> camera_numbers;
         try
         {
             camera_numbers = DiscoverCapture();
         }
-        catch (const std::exception& ex)
+        catch (...)
         {
-            throw std::runtime_error(std::string("UVC device detection failed:") + ex.what());
         }
-        if (camera_numbers.size() == 0)
-        {
-            throw std::runtime_error(std::string("UVC device detection failed: No UVC devices found."));
-        }
-        _config.cameraNumber = camera_numbers[0];
+        _config.cameraNumber = (camera_numbers.size() > 0) ? camera_numbers[0] : 0;
     }
 };
 
@@ -81,15 +75,12 @@ bool PreviewImpl::StartPreview(PreviewImageReadyCallback& callback)
                 }
                 if (res)
                 {
-                    if (container.metadata.is_snapshot)
-                    {
-                        _callback->OnSnapshotImageReady(container);
-                    }
-                    else 
-                    {
-                        container.number = frameNumber++;
-                        _callback->OnPreviewImageReady(container);
-                    }
+                    container.number = frameNumber++;
+                    _callback->OnPreviewImageReady(container);
+                }
+                else
+                {
+                    continue;
                 }
             }
         }

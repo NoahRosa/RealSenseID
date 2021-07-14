@@ -64,12 +64,6 @@ Status FaceAuthenticator::Enroll(EnrollmentCallback& callback, const char* user_
     return _impl->Enroll(callback, user_id);
 }
 
-EnrollStatus FaceAuthenticator::EnrollImage(const char* user_id, unsigned char* buffer, unsigned int width,
-                                            unsigned int height)
-{
-    return _impl->EnrollImage(user_id, buffer, width, height);
-}
-
 Status FaceAuthenticator::Authenticate(AuthenticationCallback& callback)
 {
     return _impl->Authenticate(callback);
@@ -135,7 +129,7 @@ Status FaceAuthenticator::ExtractFaceprintsForAuthLoop(AuthFaceprintsExtractionC
     return _impl->ExtractFaceprintsForAuthLoop(callback);
 }
 
-MatchResultHost FaceAuthenticator::MatchFaceprints(MatchElement& new_faceprints, Faceprints& existing_faceprints, Faceprints& updated_faceprints)
+MatchResultHost FaceAuthenticator::MatchFaceprints(Faceprints& new_faceprints, Faceprints& existing_faceprints, Faceprints& updated_faceprints)
 {
     return _impl->MatchFaceprints(new_faceprints, existing_faceprints, updated_faceprints);
 }

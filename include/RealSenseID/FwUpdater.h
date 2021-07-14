@@ -10,7 +10,6 @@
 #endif
 
 #include <string>
-#include <vector>
 
 namespace RealSenseID
 {
@@ -52,52 +51,24 @@ public:
     FwUpdater() = default;
     ~FwUpdater() = default;
 
-    // TODO: Document
-    struct UpdatePolicyInfo
-    {
-        enum class UpdatePolicy
-        {
-            CONTINOUS,
-            OPFW_FIRST,
-            REQUIRE_INTERMEDIATE_FW,
-            NOT_ALLOWED
-        };
-        UpdatePolicy policy;
-        std::string intermediate;
-    };
-    
-
     /**
-     * Extracts the firmware and recognition version from the firmware package, as well as all the modules names.
+     * Extracts the firmware version from the firmware package.
      *
      * @param[in] binPath Path to the firmware binary file.
-     * @param[out] outFwVersion Operational firmware (OPFW) version string.
-     * @param[out] outRecognitionVersion Recognition model version string.
-     * @param[out] moduleNames Names of modules found in the binary file.
+     * @param[out] outFwVersion Output version string.
      * @return True if extraction succeeded and false otherwise.
      */
-    bool ExtractFwInformation(const char* binPath, std::string& outFwVersion, std::string& outRecognitionVersion, std::vector<std::string>& moduleNames) const;
-    
-    /**
-     * Check encryption used in the binary file and answer whether a device with given serial number can decrypt it.
-     *
-     * @param[in] binPath Path to the firmware binary file.
-     * @param[in] deviceSerialNumber The device serial number as it was extracted prior to calling this function.
-     */
-    bool IsEncryptionSupported(const char* binPath, const std::string& deviceSerialNumber) const;
+    bool ExtractFwVersion(const char* binPath, std::string& outFwVersion, std::string& outRecognitionVersion) const;
 
     /**
-     * Performs a firmware update for the modules listed in moduleNames
+     * Performs a firmware update.
      *
      * @param[in] handler Responsible for handling events triggered during the update.
      * @param[in] Settings Firmware update settings.
      * @param[in] binPath Path to the firmware binary file.
-     * @param[in] moduleNames list of module names to update.
-     * @return OK if update succeeded matching error status if it failed.
+     * @param[in] excludeRecognition Skip recognition module update in case of database incompatibility.
+     * @return True if extraction succeeded and false otherwise.
      */
-    Status UpdateModules(EventHandler* handler, Settings settings, const char* binPath, const std::vector<std::string>& moduleNames) const;
-
-    // TODO: document
-    UpdatePolicyInfo DecideUpdatePolicy(const Settings& settings, const char* binPath) const;
+    Status Update(EventHandler* handler, Settings settings, const char* binPath, bool excludeRecognition) const;
 };
 } // namespace RealSenseID

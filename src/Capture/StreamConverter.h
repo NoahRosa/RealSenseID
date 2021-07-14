@@ -27,16 +27,15 @@ struct buffer
 {
     unsigned char* data = nullptr;
     unsigned int size = 0;
-    unsigned int offset = 0;
 };
 
 class StreamConverter
 {
 public:
-    StreamConverter(PreviewConfig config);
+    StreamConverter(PreviewMode mode);
     ~StreamConverter();    
-    bool Buffer2Image(Image* res,const buffer& frame_buffer,const buffer& metadata_buffer);
-    bool Buffer2Image(Image* res,const buffer& frame_buffer);
+    bool Buffer2Image(Image* res, buffer frame_buffer, buffer metadata_buffer);
+    bool Buffer2Image(Image* res, buffer frame_buffer);
     StreamAttributes GetStreamAttributes();
 
 private:

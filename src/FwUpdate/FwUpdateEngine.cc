@@ -21,7 +21,6 @@ namespace FwUpdate
 static const char* LOG_TAG = "FwUpdater";
 
 static const std::set<std::string> AllowedModules {"OPFW", "NNLED", "NNLAS", "DNET", "RECOG", "YOLO", "AS2DLR"};
-static const char* OPFW = "OPFW";
 
 struct FwUpdateEngine::ModuleVersionInfo
 {
@@ -384,20 +383,20 @@ void FwUpdateEngine::BurnModule(ProgressTick tick, const ModuleInfo& module, con
     LOG_DEBUG(LOG_TAG, "update finished");
 }
 
-void FwUpdateEngine::BurnSelectModules(const ModuleVector& modules, ProgressTick tick, bool force_full)
+void FwUpdateEngine::Session(const ModuleVector& modules, ProgressTick tick, bool force_full)
 {
-    size_t module_count = 0;
-    for (const auto& module : modules)
+    for (int i = 0; i < modules.size(); ++i)
     {
-        module_count++;
+        const auto& module = modules.at(i);
 
         auto buffer = LoadFileToBuffer(module.filename, module.aligned_size, module.size, module.file_offset);
         if (buffer.empty())
         {
             throw std::runtime_error("Failed loading firwmare file");
         }
-        auto is_last_module = module_count == modules.size();
-        bool is_first_module = module_count == 1;
+
+        auto is_first_module = i == 0;
+        auto is_last_module = i == modules.size() - 1;
         BurnModule(tick, module, buffer, is_first_module, is_last_module, force_full);
 
         LOG_INFO(LOG_TAG, "Module %s done", module.name.c_str());
@@ -454,8 +453,10 @@ void FwUpdateEngine::BurnModules(const Settings& settings, const ModuleVector& m
         _comm->WaitForIdle();
         _comm->WriteCmd(Cmds::dlspd(settings.baud_rate), true);
         _comm->WriteCmd(Cmds::dlver(), true);
+
         on_progress(0.0f);
-        BurnSelectModules(modules, progress_tick, settings.force_full);
+
+        Session(modules, progress_tick, settings.force_full);
         on_progress(1.0f);
     }
     catch (const std::exception&)

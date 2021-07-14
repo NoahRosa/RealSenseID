@@ -30,6 +30,9 @@ static RealSenseID::Examples::SignHelper s_signer;
 #endif // RSID_SECURE
 
 // map of user-id->faceprint_pair to demonstrate faceprints feature.
+// note that Faceprints contains 2 vectors :
+// (1) the original enrolled vector.
+// (2) the average vector (which will be updated over time).
 static std::map<std::string, RealSenseID::Faceprints> s_user_faceprint_db;
 
 // last faceprint auth extract status
@@ -67,7 +70,7 @@ public:
     void OnPreviewImageReady(const RealSenseID::Image image)
     {
         std::cout << "\rframe #" << image.number << ": " << image.width << "x" << image.height << " (" << image.size
-                  << " bytes)" << std::endl;
+                  << " bytes)" <<std::endl;
 
         // Enable this code to enable saving images as ppm files
         //
@@ -217,9 +220,9 @@ void get_device_config(const RealSenseID::SerialConfig& serial_config)
         std::cout << std::endl << "Authentication settings::" << std::endl;
         std::cout << " * Rotation: " << device_config.camera_rotation << std::endl;
         std::cout << " * Security: " << device_config.security_level << std::endl;
+        std::cout << " * Preview Mode: " << device_config.preview_mode << std::endl;
         std::cout << " * Algo flow Mode: " << device_config.algo_flow << std::endl;
         std::cout << " * Face policy : " << device_config.face_selection_policy << std::endl;
-        std::cout << " * Dump Mode: " << device_config.dump_mode << std::endl;
     }
     else
     {
@@ -384,36 +387,31 @@ public:
     {
     }
 
-    void OnResult(const RealSenseID::EnrollStatus status, const RealSenseID::ExtractedFaceprints* faceprints) override
+    void OnResult(const RealSenseID::EnrollStatus status, const RealSenseID::Faceprints* faceprints) override
     {
         std::cout << "on_result: status: " << status << std::endl;
-
         if (status == RealSenseID::EnrollStatus::Success)
         {
-            // handle with/without mask vectors properly.
+            s_user_faceprint_db[_user_id].version = faceprints->version;
 
-            // set the full data for the enrolled object:
-            s_user_faceprint_db[_user_id].data.version = faceprints->data.version;
-            s_user_faceprint_db[_user_id].data.flags = faceprints->data.flags;
-            s_user_faceprint_db[_user_id].data.featuresType = faceprints->data.featuresType;
+            // TODO yossidan - handle with/without mask vectors properly (if/as needed).
 
             // During enroll we update both vectors (enrollment + adaptive).
 
-            static_assert(sizeof(s_user_faceprint_db[_user_id].data.adaptiveDescriptorWithoutMask) ==
-                              sizeof(faceprints->data.featuresVector),
+            // update the adaptive vector:
+            static_assert(sizeof(s_user_faceprint_db[_user_id].adaptiveDescriptorWithoutMask) ==
+                              sizeof(faceprints->adaptiveDescriptorWithoutMask),
                           "adaptive faceprints vector (without mask) sizes does not match");
-            ::memcpy(&s_user_faceprint_db[_user_id].data.adaptiveDescriptorWithoutMask[0],
-                     &faceprints->data.featuresVector[0], sizeof(faceprints->data.featuresVector));
+            ::memcpy(&s_user_faceprint_db[_user_id].adaptiveDescriptorWithoutMask[0],
+                     &faceprints->adaptiveDescriptorWithoutMask[0], sizeof(faceprints->adaptiveDescriptorWithoutMask));
 
-            static_assert(sizeof(s_user_faceprint_db[_user_id].data.enrollmentDescriptor) ==
-                              sizeof(faceprints->data.featuresVector),
+            // also update the enrollment vector.
+            // s_user_faceprint_db[_user_id].version = faceprints->version;
+            static_assert(sizeof(s_user_faceprint_db[_user_id].enrollmentDescriptor) ==
+                              sizeof(faceprints->adaptiveDescriptorWithoutMask),
                           "enrollment faceprints vector sizes does not match");
-            ::memcpy(&s_user_faceprint_db[_user_id].data.enrollmentDescriptor[0], &faceprints->data.featuresVector[0],
-                     sizeof(faceprints->data.featuresVector));
-
-            // mark the withMask vector as invalid because its not set yet!
-            s_user_faceprint_db[_user_id].data.adaptiveDescriptorWithMask[RSID_INDEX_IN_FEATURES_VECTOR_TO_FLAGS] =
-                RealSenseID::FaVectorFlagsEnum::VecFlagNotSet;
+            ::memcpy(&s_user_faceprint_db[_user_id].enrollmentDescriptor[0],
+                     &faceprints->adaptiveDescriptorWithoutMask[0], sizeof(faceprints->adaptiveDescriptorWithoutMask));
         }
     }
 
@@ -432,6 +430,7 @@ void enroll_faceprints(const RealSenseID::SerialConfig& serial_config, const cha
 {
     auto authenticator = CreateAuthenticator(serial_config);
     MyEnrollServerClbk enroll_clbk {user_id};
+    RealSenseID::Faceprints fp;
     s_last_enroll_faceprint_status = RealSenseID::EnrollStatus::CameraStarted;
     auto status = authenticator->ExtractFaceprintsForEnroll(enroll_clbk);
     std::cout << "Status: " << status << std::endl << std::endl;
@@ -447,8 +446,7 @@ public:
     {
     }
 
-    void OnResult(const RealSenseID::AuthenticateStatus status,
-                  const RealSenseID::ExtractedFaceprints* faceprints) override
+    void OnResult(const RealSenseID::AuthenticateStatus status, const RealSenseID::Faceprints* faceprints) override
     {
         std::cout << "on_result: status: " << status << std::endl;
 
@@ -459,38 +457,29 @@ public:
             return;
         }
 
-        RealSenseID::MatchElement scanned_faceprint;
-        // scanned_faceprint.featuresType = faceprints->data.featuresType;
-        scanned_faceprint.data.version = faceprints->data.version;
-        scanned_faceprint.data.featuresType = faceprints->data.featuresType;
+        // the new vector faceprints
+        RealSenseID::Faceprints scanned_faceprint;
+        scanned_faceprint.version = faceprints->version;
+        scanned_faceprint.featuresType = faceprints->featuresType;
 
-        int32_t vecFlags = (int32_t)faceprints->data.featuresVector[RSID_INDEX_IN_FEATURES_VECTOR_TO_FLAGS];
-        int32_t opFlags = RealSenseID::FaOperationFlagsEnum::OpFlagAuthWithoutMask;
+        // TODO yossidan - handle with/without mask vectors properly (if/as needed).
 
-        if (vecFlags == RealSenseID::FaVectorFlagsEnum::VecFlagValidWithMask)
-        {
-            opFlags = RealSenseID::FaOperationFlagsEnum::OpFlagAuthWithMask;
-        }
+        // initialize the scanned_faceprint vectors:
 
-        scanned_faceprint.data.flags = opFlags;
+        static_assert(sizeof(scanned_faceprint.adaptiveDescriptorWithoutMask) ==
+                          sizeof(faceprints->adaptiveDescriptorWithoutMask),
+                      "new adaptive faceprints (without mask) vector sizes does not match");
+        ::memcpy(&scanned_faceprint.adaptiveDescriptorWithoutMask[0], &faceprints->adaptiveDescriptorWithoutMask[0],
+                 sizeof(faceprints->adaptiveDescriptorWithoutMask));
 
-        static_assert(sizeof(scanned_faceprint.data.featuresVector) == sizeof(faceprints->data.featuresVector),
-                      "new adaptive faceprints vector sizes does not match");
-        ::memcpy(&scanned_faceprint.data.featuresVector[0], &faceprints->data.featuresVector[0],
-                 sizeof(faceprints->data.featuresVector));
+        static_assert(sizeof(scanned_faceprint.enrollmentDescriptor) == sizeof(faceprints->enrollmentDescriptor),
+                      "new enrollment faceprints vector sizes does not match");
+        ::memcpy(&scanned_faceprint.enrollmentDescriptor[0], &faceprints->enrollmentDescriptor[0],
+                 sizeof(faceprints->enrollmentDescriptor));
 
         // try to match the new faceprint to one of the faceprints stored in the db
         RealSenseID::Faceprints updated_faceprint;
-
         std::cout << "\nSearching " << s_user_faceprint_db.size() << " faceprints" << std::endl;
-
-        int save_max_score = -1;
-        int winning_index = -1;
-        std::string winning_id_str = "";
-        RealSenseID::MatchResultHost winning_match_result;
-        RealSenseID::Faceprints winning_updated_faceprints;
-        int users_index = 0;
-
         for (auto& iter : s_user_faceprint_db)
         {
             auto user_id = iter.first;
@@ -500,39 +489,20 @@ public:
 
             auto match = _authenticator->MatchFaceprints(scanned_faceprint, existing_faceprint, updated_faceprint);
 
-            int current_score = (int)match.score;
-
-            // save the best winner that matched.
             if (match.success)
             {
-                if (current_score > save_max_score)
+                std::cout << "\n******* Match success. user_id: " << user_id << " *******\n" << std::endl;
+                if (match.should_update)
                 {
-                    save_max_score = current_score;
-                    winning_match_result = match;
-                    winning_index = users_index;
-                    winning_id_str = user_id;
-                    winning_updated_faceprints = updated_faceprint;
+                    iter.second = updated_faceprint; // save the updated average vector
+                    std::cout << "Updated avg faceprint in db." << std::endl;
                 }
+                break;
             }
-
-            users_index++;
-
-        } // end of for() loop
-
-        if (winning_index >= 0) // we have a winner so declare success!
-        {
-            std::cout << "\n******* Match success. user_id: " << winning_id_str << " *******\n" << std::endl;
-            // apply adaptive-update on the db.
-            if (winning_match_result.should_update)
+            else
             {
-                // apply adaptive update
-                s_user_faceprint_db[winning_id_str] = winning_updated_faceprints;
-                std::cout << "DB adaptive apdate applied to user = " << winning_id_str << "." << std::endl;
+                std::cout << "\n******* Forbidden (no faceprint matched) *******\n" << std::endl;
             }
-        }
-        else // no winner, declare authentication failed!
-        {
-            std::cout << "\n******* Forbidden (no faceprint matched) *******\n" << std::endl;
         }
     }
 
@@ -546,6 +516,7 @@ void authenticate_faceprints(const RealSenseID::SerialConfig& serial_config)
 {
     auto authenticator = CreateAuthenticator(serial_config);
     FaceprintsAuthClbk clbk(authenticator.get());
+    RealSenseID::Faceprints scanned_faceprint;
     s_last_auth_faceprint_status = RealSenseID::AuthenticateStatus::CameraStarted;
     // extract faceprints of the user in front of the device
     auto status = authenticator->ExtractFaceprintsForAuth(clbk);
@@ -686,21 +657,21 @@ void sample_loop(const RealSenseID::SerialConfig& serial_config)
             std::getline(std::cin, sec_level);
             if (sec_level.find("rec") != -1)
             {
-                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::RecognitionOnly;
+                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::RecognitionOnly;            
             }
             else if (sec_level.find("spoof") != -1)
             {
-                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::SpoofOnly;
+                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::SpoofOnly;            
             }
             else if (sec_level.find("detection") != -1)
             {
-                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::FaceDetectionOnly;
+                config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::FaceDetectionOnly;            
             }
             else
             {
                 config.algo_flow = RealSenseID::DeviceConfig::AlgoFlow::All;
             }
-
+            
             std::string rot_level;
             std::cout << "Set rotation level(0/180): ";
             std::getline(std::cin, rot_level);
@@ -713,11 +684,11 @@ void sample_loop(const RealSenseID::SerialConfig& serial_config)
             std::getline(std::cin, sec_level);
             if (sec_level.find("all") != -1)
             {
-                config.face_selection_policy = RealSenseID::DeviceConfig::FaceSelectionPolicy::All;
+                config.face_selection_policy = RealSenseID::DeviceConfig::FaceSelectionPolicy::All;            
             }
             else
             {
-                config.face_selection_policy = RealSenseID::DeviceConfig::FaceSelectionPolicy::Single;
+                config.face_selection_policy = RealSenseID::DeviceConfig::FaceSelectionPolicy::Single;              
             }
 
             set_device_config(serial_config, config);

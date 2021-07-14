@@ -10,12 +10,12 @@ add_executable(
     ${EXE_NAME}
     App.config
     App.xaml
-    App.xaml.cs    
+    App.xaml.cs
+    ConsoleWindow.xaml
+    ConsoleWindow.xaml.cs
     Dictionary1.xaml
     ErrorDialog.xaml
     ErrorDialog.xaml.cs
-    OKCancelDialog.xaml
-    OKCancelDialog.xaml.cs
     ProgressBarDialog.xaml
     ProgressBarDialog.xaml.cs
     MainWindow.xaml
@@ -67,7 +67,9 @@ csharp_set_designer_cs_properties(
 
 csharp_set_xaml_cs_properties(
     App.xaml
-    App.xaml.cs    
+    App.xaml.cs
+    ConsoleWindow.xaml
+    ConsoleWindow.xaml.cs
     Dictionary1.xaml
     ErrorDialog.xaml
     ErrorDialog.xaml.cs

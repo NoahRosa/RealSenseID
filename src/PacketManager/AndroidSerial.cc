@@ -23,6 +23,7 @@ namespace RealSenseID
 namespace PacketManager
 {
 static const char* LOG_TAG = "AndroidSerial";
+static constexpr timeout_t recv_packet_timeout {5000};
 
 static void ThrowAndroidError(std::string msg)
 {
@@ -118,8 +119,7 @@ SerialStatus AndroidSerial::RecvBytes(char* buffer, size_t n_bytes)
         return SerialStatus::RecvFailed;
     }
 
-    // set timeout to depend on number of bytes needed
-    Timer timer {std::chrono::milliseconds {200 + 4 * n_bytes}};
+    Timer timer {recv_packet_timeout};
     size_t total_bytes_read = 0;
     while (!timer.ReachedTimeout())
     {
@@ -142,7 +142,7 @@ SerialStatus AndroidSerial::RecvBytes(char* buffer, size_t n_bytes)
         }
     }
     DEBUG_SERIAL(LOG_TAG, "[rcv]", buffer, total_bytes_read);
-    DEBUG_SERIAL(LOG_TAG, "Timeout recv %zu bytes. Got only %zu bytes", n_bytes, total_bytes_read);
+    LOG_DEBUG(LOG_TAG, "Timeout recv %zu bytes. Got only %zu bytes", n_bytes, total_bytes_read);
     return SerialStatus::RecvTimeout;
 }
 

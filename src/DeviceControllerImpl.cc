@@ -56,7 +56,7 @@ Status DeviceControllerImpl::Connect(const SerialConfig& config)
 }
 
 #ifdef ANDROID
-Status DeviceControllerImpl::Connect(const AndroidSerialConfig& config)
+Status DeviceControllerImpl::Connect(int fileDescriptor, int readEndpointAddress, int writeEndpointAddress)
 {
     try
     {
@@ -64,7 +64,7 @@ Status DeviceControllerImpl::Connect(const AndroidSerialConfig& config)
         _serial.reset();
 
         _serial =
-            std::make_unique<PacketManager::AndroidSerial>(config.fileDescriptor, config.readEndpoint, config.writeEndpoint);
+            std::make_unique<PacketManager::AndroidSerial>(fileDescriptor, readEndpointAddress, writeEndpointAddress);
         return Status::Ok;
         LOG_ERROR(LOG_TAG, "Serial connection method not supported for OS");
         return Status::Error;
@@ -194,7 +194,7 @@ Status DeviceControllerImpl::QuerySerialNumber(std::string& serial)
         }
 
         // receive data until no more is available
-        constexpr size_t max_buffer_size = 128;
+        constexpr size_t max_buffer_size = 512;
         char buffer[max_buffer_size] = {0};
         for (int i = 0; i < max_buffer_size - 1; ++i)
         {

@@ -24,7 +24,7 @@ static void ThrowIfFailed(const char *what, uvc_error_t uvc_err)
 
 CaptureHandle::CaptureHandle(const PreviewConfig& config) : _config(config)
 {
-    _stream_converter = std::make_unique<StreamConverter>(_config);
+    _stream_converter = std::make_unique<StreamConverter>(_config.previewMode);
     int sys_dev = _config.cameraNumber;
     libusb_context *usb_context = NULL;
     auto api_level = android_get_device_api_level();
@@ -70,8 +70,7 @@ CaptureHandle::~CaptureHandle()
 
 bool CaptureHandle::Read(RealSenseID::Image* res)
 {
-    buffer frame_buffer;
-    buffer md_buffer;
+    buffer buffer;
     if (!stream){
         return false;
     }
@@ -81,11 +80,9 @@ bool CaptureHandle::Read(RealSenseID::Image* res)
     {
         return false;
     }
-    frame_buffer.data = (unsigned char*)frame->data;
-    frame_buffer.size = frame->data_bytes;
-    md_buffer.data = (unsigned char*)frame->metadata;
-    md_buffer.size = frame->metadata_bytes;
-    return _stream_converter->Buffer2Image(res,frame_buffer,md_buffer);
+    buffer.data = (unsigned char*)frame->data;
+    buffer.size = frame->data_bytes;
+    return _stream_converter->Buffer2Image(res,buffer);
 }
 } // namespace Capture
 } // namespace RealSenseID

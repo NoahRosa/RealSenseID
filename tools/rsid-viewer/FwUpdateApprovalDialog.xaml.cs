@@ -8,7 +8,7 @@ namespace rsid_wrapper_csharp
 {
     public partial class FwUpdateInput : Window
     {
-        private bool updateRecognition;
+        private bool excludeRecognition;
 
         public FwUpdateInput(string title, string message)
         {
@@ -19,20 +19,20 @@ namespace rsid_wrapper_csharp
             UserApprovalMessage.Text = message;
         }
 
-        public bool UpdateRecognition()
+        public bool ExcludeRecognition()
         {
-            return updateRecognition;
+            return excludeRecognition;
         }
 
         private void YesButton_Click(object sender, RoutedEventArgs e)
         {
-            updateRecognition = true;
+            excludeRecognition = true;
             DialogResult = true;
         }
 
         private void NoButton_Click(object sender, RoutedEventArgs e)
         {
-            updateRecognition = false;
+            excludeRecognition = false;
             DialogResult = true;
         }
 

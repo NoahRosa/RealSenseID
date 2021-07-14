@@ -3,46 +3,41 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace rsid_wrapper_csharp
 {
     internal class Database
     {
-
-        private static readonly string DefaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "db.db");
-
-        public static string GetDatabseDefaultPath()
-        {
-            return DefaultPath;
-        }
-
         public Database()
         {
-            FaceprintsArray = new List<(rsid.Faceprints, string)>();            
-            DbPath = DefaultPath;
-            DbPathSaveBackup = DefaultPath + ".bak";
-            DbVersion = -1;
+            faceprintsArray = new List<(rsid.Faceprints, string)>();            
+            var baseDir = System.AppDomain.CurrentDomain.BaseDirectory;
+            dbPath = Path.Combine(baseDir, "db.db");
+            dbPathSaveBackup = Path.Combine(baseDir, "saved_backup_db.db");
+            dbVersion = -1;
         }
 
         public Database(String path)
         {
-            FaceprintsArray = new List<(rsid.Faceprints, string)>();
-            DbPath = path;
-            DbPathSaveBackup = path + ".bak";
-            DbVersion = -1;
+            faceprintsArray = new List<(rsid.Faceprints, string)>();
+            var baseDir = System.AppDomain.CurrentDomain.BaseDirectory;
+            dbPath = path;
+            dbPathSaveBackup = Path.Combine(baseDir, "saved_backup_db.db");
+            dbVersion = -1;
         }
 
-        // PLE - packet layer element
-        public bool VerifyVersionMatchedPLE(ref rsid.ExtractedFaceprints faceprints)
+        public int GetDbVersion()
         {
-            bool versionMatched = ((faceprints.version == DbVersion) || (DbVersion < 0));
-            return versionMatched;
+            return dbVersion;
         }
-        // DBLE - db layer element
-        public bool VerifyVersionMatchedDBLE(ref rsid.Faceprints faceprints)
+
+        public bool VerifyVersionMatched(ref rsid.Faceprints faceprints)
         {
-            bool versionMatched = ((faceprints.version == DbVersion) || (DbVersion < 0));
+            bool versionMatched = ((faceprints.version == dbVersion) || (dbVersion < 0));
             return versionMatched;
         }
 
@@ -50,9 +45,9 @@ namespace rsid_wrapper_csharp
         {
 
             // if DB is empty - set the db version at the first push to the DB.
-            if ((DbVersion < 0) && (FaceprintsArray.Count == 0))
+            if ((dbVersion < 0) && (faceprintsArray.Count == 0))
             {
-                DbVersion = faceprints.version;
+                dbVersion = faceprints.version;
             }
             
             // handle push to db.
@@ -62,7 +57,7 @@ namespace rsid_wrapper_csharp
             }
             else
             {
-                FaceprintsArray.Add((faceprints, userId));                
+                faceprintsArray.Add((faceprints, userId));                
                 return true;
             }
             
@@ -70,42 +65,42 @@ namespace rsid_wrapper_csharp
 
         public bool DoesUserExist(string userId)
         {
-            return (FaceprintsArray.Any(item => item.Item2 == (userId + '\0')));
+            return (faceprintsArray.Any(item => item.Item2 == (userId + '\0')));
         }
 
         public bool Remove(string userId)
         {
-            int removedItems = FaceprintsArray.RemoveAll(r => r.Item2 == userId);
+            int removedItems = faceprintsArray.RemoveAll(r => r.Item2 == userId);
             return (removedItems > 0);
         }
 
         public bool RemoveAll()
         {
-            FaceprintsArray.Clear();
-            return (FaceprintsArray.Count == 0);
+            faceprintsArray.Clear();
+            return (faceprintsArray.Count == 0);
         }
 
         public void GetUserIds(out string[] userIds)
         {
-            int arrayLength = FaceprintsArray.Count;
+            int arrayLength = faceprintsArray.Count;
             userIds = new string[arrayLength];
             for (var i = 0; i < arrayLength; i++)
-                userIds[i] = FaceprintsArray[i].Item2;
+                userIds[i] = faceprintsArray[i].Item2;
         }
 
         public bool UpdateUser(int userIndex, string userIdStr, ref rsid.Faceprints updatedFaceprints)
         {
             bool success = true;
 
-            var userData = FaceprintsArray[userIndex];
+            var userData = faceprintsArray[userIndex];
             // var userFaceprints = userData.Item1;
             var userIdName = userData.Item2;
 
             if(userIdStr == userIdName)
             {
                 // update by remove and then re-insert (found no other way to do that properly).
-                FaceprintsArray.RemoveAt(userIndex);
-                FaceprintsArray.Insert(userIndex, (updatedFaceprints, userIdStr));
+                faceprintsArray.RemoveAt(userIndex);
+                faceprintsArray.Insert(userIndex, (updatedFaceprints, userIdStr));
             }
             else
             {
@@ -135,20 +130,20 @@ namespace rsid_wrapper_csharp
             Console.WriteLine("Saving your old DB to backup file and starting a new DB from scratch.");
 
             DateTime dt = DateTime.Now;
-            string backupPath = DbPathSaveBackup;
+            string backupPath = dbPathSaveBackup;
             string dtString = dt.ToString("yyyy_MM_dd__HHmmss");
             backupPath += ('_' + dtString);
 
-            Console.WriteLine($"backup (old) DB path = {backupPath}, new (now empty) DB path = {DbPath}");
+            Console.WriteLine($"backup (old) DB path = {backupPath}, new (now empty) DB path = {dbPath}");
 
             try
             {
                 // move the DB to backup file, and start a new DB from scratch.
-                File.Copy(DbPath, backupPath);
-                File.Delete(DbPath);
+                System.IO.File.Copy(dbPath, backupPath);
+                System.IO.File.Delete(dbPath);
                 RemoveAll();
                 Save();
-                DbVersion = -1; // clear the version, it will be set on the next Push() to the new DB.
+                dbVersion = -1; // clear the version, it will be set on the next Push() to the new DB.
             }
             catch (Exception e)
             {
@@ -163,11 +158,11 @@ namespace rsid_wrapper_csharp
         {
             try
             {
-                DatabaseSerializer.Serialize(FaceprintsArray, DbVersion, DbPath);
+                DatabaseSerializer.Serialize(faceprintsArray, dbVersion, dbPath);
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed saving database at path = {DbPath}. error = {e.Message}");
+                Console.WriteLine($"Failed saving database at path = {dbPath}. error = {e.Message}");
             }
         }
 
@@ -177,21 +172,17 @@ namespace rsid_wrapper_csharp
             try
             {
                 Console.WriteLine("Loading database ...");
-                if (!File.Exists(DbPath))
+                if (!File.Exists(dbPath))
                 {
                     Console.WriteLine("Database file is missing, using an empty database.");
                     return returnValue;
                 }
-                FaceprintsArray = DatabaseSerializer.Deserialize(DbPath, out DbVersion);
+                faceprintsArray = DatabaseSerializer.Deserialize(dbPath, out dbVersion);
 
-                if (FaceprintsArray.Count == 0)
-                {
-                    DbVersion = -1; // must reset dbVersion because Deserialize() may read garbage value from (empty) db file.
-                }
-                else 
+                if(faceprintsArray.Count > 0)
                 {
                     // check if version mismatch.
-                    if(DbVersion != (FaceprintsArray[0].Item1.version))
+                    if(dbVersion != (faceprintsArray[0].Item1.version))
                     {
                         // will be handled respectively in MainWindow.xaml.cs.
                         returnValue = -1; 
@@ -200,7 +191,7 @@ namespace rsid_wrapper_csharp
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed loading database at path = {DbPath}. error = {e.Message}");
+                Console.WriteLine($"Failed loading database at path = {dbPath}. error = {e.Message}");
                 Console.WriteLine("This may be due to change in DB Faceprints version, or some other error.");
                 // will be handled respectively in MainWindow.xaml.cs.
                 returnValue = -1;
@@ -211,22 +202,22 @@ namespace rsid_wrapper_csharp
 
         public int GetVersion()
         {
-            return DbVersion;
+            return dbVersion;
         }
 
-        public List<(rsid.Faceprints, string)> FaceprintsArray;    
+        public List<(rsid.Faceprints, string)> faceprintsArray;    
         
         // db will be saved to file along with its version number.
-        public int DbVersion;
+        public int dbVersion;
         
         // path of the db file.    
-        public string DbPath;
+        public string dbPath;
 
         // path of backup db file/s.
         // for saving backup of the DB in case of load failure - will save the db to backup file and
         // re-start a new db from scratch. 
         // (e.g. due to Faceprints version change).
-        public string DbPathSaveBackup; 
+        public string dbPathSaveBackup; 
     }
 
 }

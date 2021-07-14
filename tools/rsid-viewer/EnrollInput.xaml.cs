@@ -34,8 +34,8 @@ namespace rsid_wrapper_csharp
 
         public string Username
         {
-            get => UserNameInput.Text;
-            set => UserNameInput.Text = value;
+            get { return UserNameInput.Text; }
+            set { UserNameInput.Text = value; }
         }
 
         private static bool IsValidUserId(string user)

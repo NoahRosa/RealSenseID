@@ -1,27 +1,22 @@
 package com.intel.realsenseid.f450androidexample;
 
+import android.annotation.SuppressLint;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Environment;
+import android.widget.ProgressBar;
 
-import com.intel.realsenseid.api.DeviceController;
+import com.intel.realsenseid.api.AndroidSerialConfig;
 import com.intel.realsenseid.api.FwUpdater;
-import com.intel.realsenseid.api.Status;
-import com.intel.realsenseid.api.StringVector;
 import com.intel.realsenseid.api.SwigWrapper;
 import com.intel.realsenseid.impl.UsbCdcConnection;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.util.regex.Pattern;
-
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class FilesListActivity extends AppCompatActivity implements FilesListFragment.OnViewItemClickListener {
-
-    private FirmwareUpdateLogic firmwareUpdateLogic;
-    private String deviceSerialNumber = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,44 +29,6 @@ public class FilesListActivity extends AppCompatActivity implements FilesListFra
                     .addToBackStack(Environment.getExternalStorageDirectory().getAbsolutePath())
                     .commit();
         }
-        firmwareUpdateLogic = new FirmwareUpdateLogic(this);
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        retrieveDeviceSerialNumber();
-    }
-
-    private void retrieveDeviceSerialNumber() {
-        new Thread(new Runnable() {
-            public void run() {
-                UsbCdcConnection connection = new UsbCdcConnection();
-                if (connection == null) {
-                    throw new RuntimeException("Error opening a USB connection");
-                }
-                if (!connection.FindSupportedDevice(getApplicationContext())) {
-                    throw new RuntimeException("Supported USB device not found");
-                }
-                if (!connection.OpenConnection()) {
-                    throw new RuntimeException("Couldn't open connection to USB device");
-                }
-                com.intel.realsenseid.api.AndroidSerialConfig config = new com.intel.realsenseid.api.AndroidSerialConfig();
-                config.setFileDescriptor(connection.GetFileDescriptor());
-                config.setReadEndpoint(connection.GetReadEndpointAddress());
-                config.setWriteEndpoint(connection.GetWriteEndpointAddress());
-                DeviceController dc = new DeviceController();
-                dc.Connect(config);
-                String sn[] = new String[] {""};
-                Status s = dc.QuerySerialNumber(sn);
-                if (s == Status.Ok) {
-                    deviceSerialNumber = sn[0];
-                } else {
-                    deviceSerialNumber = null;
-                }
-                dc.Disconnect();
-            }
-        }).start();
     }
 
     @Override
@@ -88,71 +45,18 @@ public class FilesListActivity extends AppCompatActivity implements FilesListFra
         FwUpdater fwu = new FwUpdater();
         String[] fwVersion = new String[]{""};
         String[] recognitionVersion = new String[]{""};
-        StringVector moduleNames = new StringVector();
-        boolean versionExtractionStatus = fwu.ExtractFwInformation(path, fwVersion, recognitionVersion, moduleNames);
+        boolean versionExtractionStatus = fwu.ExtractFwVersion(path, fwVersion, recognitionVersion);
         String firmwareVersion = fwVersion[0];
         if (!versionExtractionStatus) {
             showIncompatibleFileDialog(fileModel.getName());
             return;
         }
-        if (!fwu.IsEncryptionSupported(fileModel.getPath(), deviceSerialNumber)) {
-            showIncompatibleSkuDialog(fileModel.getName(), deviceSerialNumber);
-            return;
-        }
+        // Something seems to be wrong wit the version compatibility check. Disabled for now.
         if (!SwigWrapper.IsFwCompatibleWithHost(firmwareVersion)) {
             showIncompatibleVersionDialog(fileModel.getName(), firmwareVersion);
             return;
         }
-        FwUpdater.UpdatePolicyInfo policyInfo =  firmwareUpdateLogic.decideUpdatePolicy(fileModel.getPath());
-        if (policyInfo.getPolicy() == FwUpdater.UpdatePolicyInfo.UpdatePolicy.NOT_ALLOWED)
-        {
-            showPolicyNotAllowedDialog();
-            return;
-        }
-        if  (policyInfo.getPolicy() == FwUpdater.UpdatePolicyInfo.UpdatePolicy.REQUIRE_INTERMEDIATE_FW)
-        {
-            showPolicyRequireIntermediateDialog(policyInfo.getIntermediate());
-            return;
-        }
         showUpdateConfirmationDialog(fileModel, firmwareVersion, recognitionVersion[0]);
-    }
-
-    private void showPolicyRequireIntermediateDialog(String intermediateVersion) {
-        new AlertDialog.Builder(this)
-                .setTitle("Incompatible firmware version")
-                .setMessage("Firmware cannot be updated directly to the chosen version.\n" +
-                        "Flash firmware version " + intermediateVersion + " first.\n")
-                .setPositiveButton(android.R.string.ok, null).show();
-    }
-
-    private void showPolicyNotAllowedDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Incompatible firmware version")
-                .setMessage("Update from current device firmware to selected firmware file\n" +
-                        "is unsupported by this host application.\n")
-                .setPositiveButton(android.R.string.ok, null).show();
-    }
-
-    private void showIncompatibleSkuDialog(String fileName, String deviceSerialNumber) {
-        String sku = DeviceSerialNumberToSku(deviceSerialNumber);
-        new AlertDialog.Builder(this)
-                .setTitle("Incompatible firmware SKU")
-                .setMessage("Selected firmware version is incompatible with your F450 model.\n" +
-                        "Please make sure the firmware file you're using is for " + sku +
-                        " devices and try again.\n")
-                .setPositiveButton(android.R.string.ok, null).show();
-    }
-
-    private String DeviceSerialNumberToSku(String deviceSerialNumber)
-    {
-        Pattern sku2Option1 = Pattern.compile("12[02]\\d6228\\d{4}.*");
-        Pattern sku2Option2 = Pattern.compile("\\d{4}6229\\d{4}.*");
-
-        if (sku2Option1.matcher(deviceSerialNumber).matches() || sku2Option2.matcher(deviceSerialNumber).matches())
-        {
-            return "sku2";
-        }
-        return "sku1";
     }
 
     private void showIncompatibleVersionDialog(String fileName, String firmwareVersion) {
@@ -187,11 +91,59 @@ public class FilesListActivity extends AppCompatActivity implements FilesListFra
                     @Override
                     public void onClick(DialogInterface dialogInterface, int i) {
                         switchToProgressFragment();
-                        firmwareUpdateLogic.updateFirmware(fileModel);
+                        updateFirmware(fileModel);
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
+
+    private void updateFirmware(@NotNull FileModel fileModel) {
+        new Thread(new Runnable() {
+            public void run() {
+                String path = fileModel.getPath();
+                FwUpdater fwu = new FwUpdater();
+                UsbCdcConnection connection = new UsbCdcConnection();
+                if (connection == null) {
+                    throw new RuntimeException("Error opening a USB connection");
+                }
+                if (!connection.FindSupportedDevice(getApplicationContext())) {
+                    throw new RuntimeException("Supported USB device not found");
+                }
+                if (!connection.OpenConnection()) {
+                    throw new RuntimeException("Couldn't open connection to USB device");
+                }
+
+                AndroidSerialConfig config = new AndroidSerialConfig();
+                config.setFileDescriptor(connection.GetFileDescriptor());
+                config.setReadEndpoint(connection.GetReadEndpointAddress());
+                config.setWriteEndpoint(connection.GetWriteEndpointAddress());
+                FwUpdater.Settings settings = new FwUpdater.Settings();
+                settings.setAndroid_config(config);
+                FwUpdater.EventHandler handler = new FwUpdater.EventHandler() {
+                    @SuppressLint("DefaultLocale")
+                    @Override
+                    public void OnProgress(float progress) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                ProgressBar pb = (ProgressBar) findViewById(R.id.update_progress_progressBar);
+                                pb.setProgress((int) (progress * 100));
+                            }
+                        });
+                    }
+                };
+                fwu.Update(handler, settings, path, false);
+                connection.CloseConnection();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        finish();
+                    }
+                });
+            }
+        }).start();
+    }
+
 
     @Override
     public void onLongClick(FileModel fileModel) {

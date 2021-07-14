@@ -28,6 +28,7 @@ set(SOURCES
     "${SRC_DIR}/Logging.cc"
     "${SRC_DIR}/FwUpdater.cc"
     "${SRC_DIR}/DiscoverDevices.cc"
+    "${SRC_DIR}/rs232.c"
 )
 
 
@@ -41,7 +42,7 @@ if(RSID_PREVIEW)
 	    target_include_directories(${LIBRSID_CPP_TARGET} PUBLIC "${THIRD_PARTY_DIRECTORY}/uvc/include")
     endif()
     target_include_directories(${LIBRSID_CPP_TARGET}  PRIVATE "${THIRD_PARTY_DIRECTORY}/libjpeg-turbo_2_1_0")
-    target_include_directories(${LIBRSID_CPP_TARGET}  PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../3rdparty/libjpeg-turbo_2_1_0")
+    target_include_directories(${LIBRSID_CPP_TARGET}  PRIVATE "${CMAKE_BINARY_DIR}/3rdparty/libjpeg-turbo_2_1_0")        
     target_link_libraries(${LIBRSID_CPP_TARGET} PRIVATE jpeg-static)        
     add_subdirectory("${SRC_DIR}/Capture")
 endif()
@@ -67,7 +68,6 @@ target_compile_definitions(${LIBRSID_CPP_TARGET}
     PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
         $<$<BOOL:${RSID_DEBUG_VALUES}>:RSID_DEBUG_VALUES>
-        $<$<BOOL:${RSID_DEBUG_PACKETS}>:RSID_DEBUG_PACKETS>
     PUBLIC
         $<$<BOOL:${RSID_SECURE}>:RSID_SECURE>
 )

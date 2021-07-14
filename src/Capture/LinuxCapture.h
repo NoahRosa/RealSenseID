@@ -10,8 +10,6 @@ namespace RealSenseID
 namespace Capture
 {
 
-class V4lNode;
-
 class CaptureHandle
 {
 public:
@@ -25,9 +23,9 @@ public:
     void operator=(const CaptureHandle&) = delete;
 
 private:
+    int _fd = 0;
+    std::vector<buffer> _buffers;
     std::unique_ptr<StreamConverter> _stream_converter;
-    std::unique_ptr<V4lNode> _frame_node;
-    std::unique_ptr<V4lNode> _md_node;
     PreviewConfig _config;
 };
 } // namespace Capture

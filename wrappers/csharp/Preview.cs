@@ -13,7 +13,7 @@ namespace rsid
     {
         MJPEG_1080P = 0, // default
         MJPEG_720P = 1,
-        RAW10_1080P = 2
+        RAW10_1080P = 2 // dump all frames
     };
 
     [StructLayout(LayoutKind.Sequential)]
@@ -21,7 +21,6 @@ namespace rsid
     {
         public int cameraNumber;
         public PreviewMode previewMode;
-        public bool portraitMode;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 0)]
@@ -41,7 +40,6 @@ namespace rsid
         public UInt32 sensor_id;
         public bool led;
         public bool projector;
-        public bool is_snapshot;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -61,7 +59,6 @@ namespace rsid
     public class Preview : IDisposable
     {
         PreviewCallback _clbkDelegate;
-        PreviewCallback _clbkDelegateSnapshot;
         PreviewConfig _config;
 
         public Preview(PreviewConfig config)
@@ -90,26 +87,16 @@ namespace rsid
             Dispose(false);
         }
 
-        public bool Start(PreviewCallback clbkPreview)
+        public bool Start(PreviewCallback clbk)
         {            
             if (_handle == IntPtr.Zero)
                 return false;
 
-            _clbkDelegate = clbkPreview; //save it to prevent from the delegate garbage collected
+            _clbkDelegate = clbk; //save it to prevent from the delegate garbage collected
             var rv = rsid_start_preview(_handle, _clbkDelegate, IntPtr.Zero) != 0;
             return rv;
         }
 
-        public bool Start(PreviewCallback clbkPreview, PreviewCallback clbkSnapshot)
-        {
-            if (_handle == IntPtr.Zero)
-                return false;
-
-            _clbkDelegate = clbkPreview; //save it to prevent from the delegate garbage collected
-            _clbkDelegateSnapshot = clbkSnapshot;
-            var rv = rsid_start_preview_and_snapshots(_handle, _clbkDelegate, _clbkDelegateSnapshot, IntPtr.Zero) != 0;
-            return rv;
-        }
 
         public bool Pause()
         {
@@ -168,10 +155,7 @@ namespace rsid
         static extern void rsid_destroy_preview(IntPtr rsid_preview);
 
         [DllImport(Shared.DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        static extern int rsid_start_preview(IntPtr rsid_preview, PreviewCallback clbkPreview,IntPtr ctx);
-
-        [DllImport(Shared.DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        static extern int rsid_start_preview_and_snapshots(IntPtr rsid_preview, PreviewCallback clbkPreview, PreviewCallback clbkSnapshots, IntPtr ctx);
+        static extern int rsid_start_preview(IntPtr rsid_preview, PreviewCallback clbk, IntPtr ctx);
 
         [DllImport(Shared.DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         static extern int rsid_pause_preview(IntPtr rsid_preview);

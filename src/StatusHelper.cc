@@ -236,16 +236,16 @@ const char* Description(DeviceConfig::FaceSelectionPolicy policy)
     }
 }
 
-const char* Description(DeviceConfig::DumpMode dump_mode)
+const char* Description(DeviceConfig::PreviewMode preview_mode)
 {
-    switch (dump_mode)
+    switch (preview_mode)
     {
-    case DeviceConfig::DumpMode::None:
-        return "None";
-    case DeviceConfig::DumpMode::CroppedFace:
-        return "CroppedFace";
-    case DeviceConfig::DumpMode::FullFrame:
-        return "FullFrame";
+    case DeviceConfig::PreviewMode::MJPEG_1080P:
+        return "MJPEG_1080P";
+    case DeviceConfig::PreviewMode::MJPEG_720P:
+        return "MJPEG_720P";
+    case DeviceConfig::PreviewMode::RAW10_1080P:
+        return "RAW10_1080P";
     default:
         return "Unknown value";
     }

@@ -6,10 +6,11 @@
 #include "AuthenticateStatus.h"
 #include "FaceRect.h"
 #include <vector>
-#include "Faceprints.h"
 
 namespace RealSenseID
 {
+class Faceprints;
+
 /**
  * User defined callback for faceprints extraction.
  * Callback will be used to provide feedback to the client.
@@ -25,7 +26,7 @@ public:
      * @param[in] status Final authentication status.
      * @param[in] faceprints Pointer to the requested faceprints which were just extracted from the device.     
      */
-    virtual void OnResult(const AuthenticateStatus status, const ExtractedFaceprints* faceprints) = 0;
+    virtual void OnResult(const AuthenticateStatus status, const Faceprints* faceprints) = 0;
 
     /**
      * Called to inform the client of problems encountered during the authentication operation.

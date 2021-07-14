@@ -33,6 +33,8 @@ using Session = RealSenseID::PacketManager::NonSecureSession;
 
 namespace RealSenseID
 {
+struct SecureVersionDescriptor;
+
 class FaceAuthenticatorImpl
 {
 public:
@@ -56,7 +58,6 @@ public:
 #endif
 
     Status Enroll(EnrollmentCallback& callback, const char* user_id);
-    EnrollStatus EnrollImage(const char* user_id, unsigned char* buffer, unsigned int width, unsigned int height);
     Status Authenticate(AuthenticationCallback& callback);
     Status AuthenticateLoop(AuthenticationCallback& callback);
     Status Cancel();
@@ -72,8 +73,7 @@ public:
     Status ExtractFaceprintsForEnroll(EnrollFaceprintsExtractionCallback& callback);
     Status ExtractFaceprintsForAuth(AuthFaceprintsExtractionCallback& callback);
     Status ExtractFaceprintsForAuthLoop(AuthFaceprintsExtractionCallback& callback);
-    
-    MatchResultHost MatchFaceprints(MatchElement& new_faceprints, Faceprints& existing_faceprints,
+    MatchResultHost MatchFaceprints(Faceprints& new_faceprints, Faceprints& existing_faceprints,
                                     Faceprints& updated_faceprints);
 
     Status GetUsersFaceprints(Faceprints* user_features, unsigned int& num_of_users);

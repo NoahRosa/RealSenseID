@@ -27,9 +27,9 @@ Status DeviceController::Connect(const SerialConfig& config)
 }
 
 #ifdef ANDROID
-Status DeviceController::Connect(const AndroidSerialConfig& config)
+Status DeviceController::Connect(int fileDescriptor, int readEndpointAddress, int writeEndpointAddress)
 {
-    return _impl->Connect(config);
+    return _impl->Connect(fileDescriptor, readEndpointAddress, writeEndpointAddress);
 }
 #endif
 

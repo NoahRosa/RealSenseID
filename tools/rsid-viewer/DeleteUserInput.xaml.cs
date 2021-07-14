@@ -2,6 +2,7 @@
 // Copyright(c) 2020-2021 Intel Corporation. All Rights Reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,6 +27,12 @@ namespace rsid_wrapper_csharp
             this.Owner = Application.Current.MainWindow;            
             InitializeComponent();            
         }
+
+        public IEnumerable<string> UserIds { get; private set; }
+
+        public string SelectedUser { get; set; }
+
+        public bool DeleteAll { get; set; } = false;
 
         private void DeleteUserOKButton_Click(object sender, RoutedEventArgs e)
         {

@@ -92,7 +92,7 @@ public:
     /**
      *  Max user id size is 30 bytes, 31 bytes including '\0'
      */
-    static constexpr size_t MAX_USERID_LENGTH = RSID_MAX_USER_ID_LENGTH_IN_DB;
+    static constexpr size_t MAX_USERID_LENGTH = 31;
 
     /**
      * Enroll a user.
@@ -108,16 +108,6 @@ public:
      * @return Status (Status::Ok on success).
      */
     Status Enroll(EnrollmentCallback& callback, const char* user_id);
-
-    /**
-     * Enroll a user using an image of his face.
-     * @param[in] user_id Null terminated C string of ascii chars. Max user id size is MAX_USERID_LENGTH bytes
-     * @param[in] buffer bgr24 image buffer of the enrolled user face. Max buffer size is 950MB(i.e. Width x Height x 3 should not exceed it)
-     * @param[in] width image width.
-     * @param[in] width image height.
-     * @return EnrollStatus (EnrollStatus::Success on success).
-     */
-    EnrollStatus EnrollImage(const char* user_id, unsigned char* buffer, unsigned int width, unsigned int height);
 
     /**
      * Attempt to authenticate.
@@ -251,7 +241,7 @@ public:
      * @return MatchResultHost match result, the 'success' field indicates if the two faceprints belong to the same
      * person.
      */
-    MatchResultHost MatchFaceprints(MatchElement& new_faceprints, Faceprints& existing_faceprints,
+    MatchResultHost MatchFaceprints(Faceprints& new_faceprints, Faceprints& existing_faceprints,
                                     Faceprints& updated_faceprints);
 
     /**
@@ -262,7 +252,7 @@ public:
      * @param[out] Number of users exported from the device.
      * @return Status (Status::Ok on success).
      */
-    Status GetUsersFaceprints(Faceprints* user_features, unsigned int& num_of_users);
+    Status GetUsersFaceprints(Faceprints* user_features, unsigned int&num_of_users);
 
     /**
      * Insert each user entry from the array into the device's database.
@@ -270,7 +260,7 @@ public:
      * @param[in] Number of users in the array.
      * @return Status (Status::Ok on success).
      */
-    Status SetUsersFaceprints(UserFaceprints* user_features, unsigned int num_of_users);
+    Status SetUsersFaceprints (UserFaceprints * user_features, unsigned int num_of_users);
 
 private:
     FaceAuthenticatorImpl* _impl = nullptr;
