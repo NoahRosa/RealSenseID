@@ -22,6 +22,10 @@ if(RSID_TOOLS)
     endif()
 endif()
 
+if(RSID_SAMPLES)
+    install(TARGETS authenticate-cpp-sample)
+endif()
+
 
 install(
     TARGETS ${LIBRSID_CPP_TARGET}  ${LIBRSID_C_TARGET} 
