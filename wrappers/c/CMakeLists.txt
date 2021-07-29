@@ -30,6 +30,7 @@ set_target_properties(${LIBRSID_C_TARGET}
         COMPILE_DEFINITIONS $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
         DEBUG_POSTFIX ${RSID_DEBUG_POSTFIX}
         FOLDER "wrappers"
+        VERSION 1
 )
 
 if(RSID_SECURE)
