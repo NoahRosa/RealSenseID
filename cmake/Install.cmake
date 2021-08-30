@@ -23,7 +23,7 @@ if(RSID_TOOLS)
 endif()
 
 if(RSID_SAMPLES)
-    install(TARGETS authenticate-cpp-sample)
+    install(TARGETS authenticate-cpp-sample DESTINATION "/home/root")
 endif()
 
 
